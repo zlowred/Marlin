@@ -616,12 +616,12 @@ static uint8_t target_extruder;
 float cartes[XYZ] = { 0 };
 
 #if ENABLED(FILAMENT_WIDTH_SENSOR)
-  bool filament_sensor = false;  //M405 turns on filament_sensor control, M406 turns it off
-  float filament_width_nominal = DEFAULT_NOMINAL_FILAMENT_DIA,  // Nominal filament width. Change with M404
+  bool filament_sensor = false;                                 // M405 turns on filament sensor control. M406 turns it off.
+  float filament_width_nominal = DEFAULT_NOMINAL_FILAMENT_DIA,  // Nominal filament width. Change with M404.
         filament_width_meas = DEFAULT_MEASURED_FILAMENT_DIA;    // Measured filament diameter
-  int8_t measurement_delay[MAX_MEASUREMENT_DELAY + 1]; // Ring buffer to delayed measurement. Store extruder factor after subtracting 100
-  int filwidth_delay_index[2] = { 0, -1 };  // Indexes into ring buffer
-  int meas_delay_cm = MEASUREMENT_DELAY_CM;  //distance delay setting
+  int8_t measurement_delay[MAX_MEASUREMENT_DELAY + 1];          // Ring buffer to delayed measurement. Store extruder factor after subtracting 100
+  int filwidth_delay_index[2] = { 0, -1 };                      // Indexes into ring buffer
+  int meas_delay_cm = MEASUREMENT_DELAY_CM;                     // Distance delay setting
 #endif
 
 #if ENABLED(FILAMENT_RUNOUT_SENSOR)
@@ -676,14 +676,15 @@ static inline signed char pgm_read_any(const signed char *p) { return pgm_read_b
 
 #define XYZ_CONSTS_FROM_CONFIG(type, array, CONFIG) \
   static const PROGMEM type array##_P[XYZ] = { X_##CONFIG, Y_##CONFIG, Z_##CONFIG }; \
-  static inline type array(AxisEnum axis) { return pgm_read_any(&array##_P[axis]); }
+  static inline type array(AxisEnum axis) { return pgm_read_any(&array##_P[axis]); } \
+  typedef void __void_##CONFIG##__
 
-XYZ_CONSTS_FROM_CONFIG(float, base_min_pos,   MIN_POS)
-XYZ_CONSTS_FROM_CONFIG(float, base_max_pos,   MAX_POS)
-XYZ_CONSTS_FROM_CONFIG(float, base_home_pos,  HOME_POS)
-XYZ_CONSTS_FROM_CONFIG(float, max_length,     MAX_LENGTH)
-XYZ_CONSTS_FROM_CONFIG(float, home_bump_mm,   HOME_BUMP_MM)
-XYZ_CONSTS_FROM_CONFIG(signed char, home_dir, HOME_DIR)
+XYZ_CONSTS_FROM_CONFIG(float, base_min_pos,   MIN_POS);
+XYZ_CONSTS_FROM_CONFIG(float, base_max_pos,   MAX_POS);
+XYZ_CONSTS_FROM_CONFIG(float, base_home_pos,  HOME_POS);
+XYZ_CONSTS_FROM_CONFIG(float, max_length,     MAX_LENGTH);
+XYZ_CONSTS_FROM_CONFIG(float, home_bump_mm,   HOME_BUMP_MM);
+XYZ_CONSTS_FROM_CONFIG(signed char, home_dir, HOME_DIR);
 
 /**
  * ***************************************************************************
@@ -714,13 +715,13 @@ static void report_current_position();
 #if ENABLED(DEBUG_LEVELING_FEATURE)
   void print_xyz(const char* prefix, const char* suffix, const float x, const float y, const float z) {
     serialprintPGM(prefix);
-    SERIAL_ECHOPAIR("(", x);
+    SERIAL_CHAR('(');
+    SERIAL_ECHO(x);
     SERIAL_ECHOPAIR(", ", y);
     SERIAL_ECHOPAIR(", ", z);
     SERIAL_CHAR(')');
 
-    if (suffix) serialprintPGM(suffix);
-    else SERIAL_EOL;
+    suffix ? serialprintPGM(suffix) : SERIAL_EOL;
   }
 
   void print_xyz(const char* prefix, const char* suffix, const float xyz[]) {
@@ -8219,10 +8220,10 @@ inline void gcode_M400() { stepper.synchronize(); }
     NOMORE(meas_delay_cm, MAX_MEASUREMENT_DELAY);
 
     if (filwidth_delay_index[1] == -1) { // Initialize the ring buffer if not done since startup
-      int temp_ratio = thermalManager.widthFil_to_size_ratio();
+      const int temp_ratio = thermalManager.widthFil_to_size_ratio() - 100; // -100 to scale within a signed byte
 
       for (uint8_t i = 0; i < COUNT(measurement_delay); ++i)
-        measurement_delay[i] = temp_ratio - 100;  // Subtract 100 to scale within a signed byte
+        measurement_delay[i] = temp_ratio;
 
       filwidth_delay_index[0] = filwidth_delay_index[1] = 0;
     }
@@ -8282,7 +8283,6 @@ void quickstop_stepper() {
         }
 
         ubl.load_mesh(storage_slot);
-        if (storage_slot != ubl.state.eeprom_storage_slot) ubl.store_state();
         ubl.state.eeprom_storage_slot = storage_slot;
       }
     #endif // AUTO_BED_LEVELING_UBL
@@ -10279,7 +10279,7 @@ void process_next_command() {
         case 407:   // M407: Display measured filament diameter
           gcode_M407();
           break;
-      #endif // ENABLED(FILAMENT_WIDTH_SENSOR)
+      #endif // FILAMENT_WIDTH_SENSOR
 
       #if PLANNER_LEVELING
         case 420: // M420: Enable/Disable Bed Leveling
@@ -11568,47 +11568,46 @@ void prepare_move_to_destination() {
       #ifdef TCCR0A
         case TIMER0A:
         case TIMER0B:
-          //SET_CS(0, val);
+          //_SET_CS(0, val);
           break;
       #endif
       #ifdef TCCR1A
         case TIMER1A:
         case TIMER1B:
-          //SET_CS(1, val);
+          //_SET_CS(1, val);
           break;
       #endif
       #ifdef TCCR2
         case TIMER2:
         case TIMER2:
-          TCCR2 &= ~(_BV(CS10) | _BV(CS11) | _BV(CS12));
-          TCCR2 |= val;
+          _SET_CS(2, val);
           break;
       #endif
       #ifdef TCCR2A
         case TIMER2A:
         case TIMER2B:
-          SET_CS(2, val);
+          _SET_CS(2, val);
           break;
       #endif
       #ifdef TCCR3A
         case TIMER3A:
         case TIMER3B:
         case TIMER3C:
-          SET_CS(3, val);
+          _SET_CS(3, val);
           break;
       #endif
       #ifdef TCCR4A
         case TIMER4A:
         case TIMER4B:
         case TIMER4C:
-          SET_CS(4, val);
+          _SET_CS(4, val);
           break;
       #endif
       #ifdef TCCR5A
         case TIMER5A:
         case TIMER5B:
         case TIMER5C:
-          SET_CS(5, val);
+          _SET_CS(5, val);
           break;
       #endif
     }
